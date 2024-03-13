@@ -33,7 +33,7 @@ Bem-vindo ao **Seu App**, uma aplicação desenvolvida em Kotlin que replicou a 
 
 <p align="center">
   <a href="https://github.com/rafaelchriss/IfoodAutenticacao">
-    <img src="https://github.com/rafaelchriss/IfoodAutenticacao/assets/seu_app_ifood_auth.png" alt="Tela de Autenticação Ifood" width="500">
+    <img src="https://github.com/rafaelchriss/IfoodAutenticacao/assets/86614504/ed2ebc1b-df2a-485d-8150-91a3c7bbe250" alt="Tela de Autenticação Ifood" width="500">
   </a>
 </p>
 
