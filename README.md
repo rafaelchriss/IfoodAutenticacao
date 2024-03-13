@@ -37,4 +37,4 @@ Bem-vindo ao **Seu App**, uma aplicação desenvolvida em Kotlin que replicou a 
   </a>
 </p>
 
-Explore o aplicativo e vivencie a jornada de construção de uma autenticação eficiente e segura, inspirada na popular plataforma Ifood. 🚀✨
+Explore o aplicativo e vivencie a jornada de construção de uma autenticação eficiente, inspirada na popular plataforma Ifood. 🚀✨
