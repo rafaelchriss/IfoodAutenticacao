@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1047083096468",
+    "project_id": "ifood-auntenticacao",
+    "storage_bucket": "ifood-auntenticacao.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1047083096468:android:7b3d41f28324f661f19781",
+        "android_client_info": {
+          "package_name": "com.rafaelsantos.ifoodautenticacao"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDKFKzodWhv3X5PkfwQF7AnqJuWfUxof5g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
