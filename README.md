@@ -1,4 +1,4 @@
-# Seu App - Replica de Autenticação Ifood 🍔📱
+# Seu App - Réplica de Autenticação Ifood 🍔📱
 
 Bem-vindo ao **Seu App**, uma aplicação desenvolvida em Kotlin que replicou a autenticação do Ifood. Este projeto faz parte do curso de desenvolvimento mobile do professor Jamilton Damasceno, proporcionando uma experiência prática na criação de uma autenticação segura inspirada no Ifood.
 
