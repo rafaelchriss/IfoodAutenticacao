@@ -26,7 +26,10 @@ jobs:
 
     steps:
       - name: Test
-        run: echo "Test"
+        uses: rafaelchriss/IfoodAutenticacao@master
+        with:
+          a: 1
+          b: 2
 
   deploy:
     runs-on: ubuntu-latest
