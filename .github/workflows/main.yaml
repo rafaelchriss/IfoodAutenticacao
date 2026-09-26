@@ -4,8 +4,11 @@ name: CI
 
 # Controls when the workflow will run
 on:
-    schedule:
-    - cron: '22 18 * * *' # every hour
+  schedule:
+    - cron: '22 18 * * *' # every day at 18:22 UTC
+
+  workflow_dispatch:
+
   #push:
     #branches:
       #- master
