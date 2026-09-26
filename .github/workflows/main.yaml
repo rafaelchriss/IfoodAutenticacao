@@ -19,9 +19,21 @@ jobs:
       - name: Build
         run: echo "Build"
 
+
+    test:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
       - name: Test
         run: echo "Test"
 
+    deploy:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steeps:
+    
       - name: Deploy
         run: echo "Deploy"
         
