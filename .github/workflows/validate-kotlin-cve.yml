@@ -1,0 +1,175 @@
+name: Validate Kotlin Gradle Plugin CVE
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Give permission to Gradle
+        run: chmod +x ./gradlew
+
+      - name: Show Gradle version
+        run: |
+          ./gradlew --version
+
+      - name: Search Kotlin configuration
+        run: |
+          echo "=========================================="
+          echo " Kotlin references found in project"
+          echo "=========================================="
+
+          grep -Rni "kotlin" \
+            --include="*.gradle" \
+            --include="*.gradle.kts" \
+            --include="*.toml" \
+            . || true
+
+      - name: Check Kotlin Gradle Plugin version
+        run: |
+          echo "=========================================="
+          echo " Kotlin Gradle Plugin dependency"
+          echo "=========================================="
+
+          ./gradlew buildEnvironment > build-environment.txt 2>&1 || true
+
+          cat build-environment.txt
+
+          echo ""
+          echo "========== FILTER =========="
+
+          grep -i "kotlin-gradle-plugin" build-environment.txt || true
+
+      - name: First build with Gradle Build Cache
+        run: |
+          echo "=========================================="
+          echo " FIRST BUILD"
+          echo "=========================================="
+
+          ./gradlew clean assembleDebug \
+            --build-cache \
+            --info \
+            > first-build.log 2>&1
+
+          tail -100 first-build.log
+
+      - name: Second build with Gradle Build Cache
+        run: |
+          echo "=========================================="
+          echo " SECOND BUILD"
+          echo "=========================================="
+
+          ./gradlew assembleDebug \
+            --build-cache \
+            --info \
+            > second-build.log 2>&1
+
+          tail -100 second-build.log
+
+      - name: Search for cache usage
+        run: |
+          echo "=========================================="
+          echo " CACHE RESULTS"
+          echo "=========================================="
+
+          echo ""
+          echo "--- FIRST BUILD ---"
+
+          grep -Ei \
+            "FROM-CACHE|build cache|cache entry|stored cache|loaded cache" \
+            first-build.log || true
+
+          echo ""
+          echo "--- SECOND BUILD ---"
+
+          grep -Ei \
+            "FROM-CACHE|build cache|cache entry|stored cache|loaded cache" \
+            second-build.log || true
+
+      - name: Check affected Kotlin version
+        run: |
+          echo "=========================================="
+          echo " VULNERABILITY VALIDATION"
+          echo "=========================================="
+
+          if grep -q "kotlin-gradle-plugin:2.2.10" build-environment.txt; then
+
+            echo "WARNING: kotlin-gradle-plugin 2.2.10 found"
+            echo "The affected component is present."
+
+            echo "### Kotlin CVE validation" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ kotlin-gradle-plugin 2.2.10 detected" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The vulnerable dependency is present in the build environment." >> $GITHUB_STEP_SUMMARY
+
+          else
+
+            echo "Exact version 2.2.10 was not found."
+
+            echo "### Kotlin CVE validation" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ kotlin-gradle-plugin 2.2.10 was not detected directly." >> $GITHUB_STEP_SUMMARY
+
+          fi
+
+      - name: Check Build Cache reachability
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Gradle Build Cache" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if grep -Eqi \
+            "FROM-CACHE|loaded cache entry|build cache" \
+            second-build.log; then
+
+            echo "Build Cache activity detected."
+
+            echo "✅ Build Cache activity detected during compilation." \
+              >> $GITHUB_STEP_SUMMARY
+
+          else
+
+            echo "No clear Build Cache usage detected."
+
+            echo "⚠️ No clear Build Cache reuse was identified." \
+              >> $GITHUB_STEP_SUMMARY
+
+          fi
+
+      - name: Generate final validation summary
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Interpretation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | Meaning |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Vulnerable plugin detected | Dependency finding confirmed |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Cache active | Vulnerable functionality may be reachable |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cache reused on second build | Cache processing confirmed |" >> $GITHUB_STEP_SUMMARY
+          echo "| Arbitrary command executed | RCE demonstrated |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "This workflow validates presence and reachability. It does not inject a malicious serialized cache object." >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload validation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: kotlin-cve-validation
+          path: |
+            build-environment.txt
+            first-build.log
+            second-build.log
