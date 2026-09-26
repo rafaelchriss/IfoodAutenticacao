@@ -239,13 +239,219 @@ jobs:
           )
           PY
 
+      - name: Generate Mobile Security Summary
+        if: always()
+        run: |
+          echo "# 📱 Mobile Security - Nuclei" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          python3 <<'PY'
+          import json
+          import os
+          from collections import Counter
+
+          files = [
+              ("Android", "nuclei-android.jsonl"),
+              ("API Keys", "nuclei-keys.jsonl")
+          ]
+
+          findings = []
+
+          for source, filename in files:
+              if not os.path.exists(filename):
+                  continue
+
+              with open(filename, "r", encoding="utf-8") as f:
+                  for line in f:
+                      line = line.strip()
+
+                      if not line:
+                          continue
+
+                      try:
+                          item = json.loads(line)
+                      except Exception:
+                          continue
+
+                      info = item.get("info", {})
+
+                      findings.append({
+                          "source": source,
+                          "name": info.get(
+                              "name",
+                              "Nuclei Finding"
+                          ),
+                          "severity": info.get(
+                              "severity",
+                              "unknown"
+                          ).lower(),
+                          "template": item.get(
+                              "template-id",
+                              "unknown"
+                          ),
+                          "matched": (
+                              item.get("matched-at")
+                              or item.get("host")
+                              or "N/A"
+                          )
+                      })
+
+          summary_file = os.environ["GITHUB_STEP_SUMMARY"]
+
+          severity_order = [
+              "critical",
+              "high",
+              "medium",
+              "low",
+              "info",
+              "unknown"
+          ]
+
+          icons = {
+              "critical": "🔴",
+              "high": "🟠",
+              "medium": "🟡",
+              "low": "🔵",
+              "info": "⚪",
+              "unknown": "⚫"
+          }
+
+          counts = Counter(
+              finding["severity"]
+              for finding in findings
+          )
+
+          with open(summary_file, "a", encoding="utf-8") as out:
+
+              out.write("## Resultado geral\n\n")
+
+              out.write("| Severidade | Quantidade |\n")
+              out.write("|---|---:|\n")
+
+              for severity in severity_order:
+                  out.write(
+                      f"| {icons[severity]} "
+                      f"{severity.upper()} | "
+                      f"{counts.get(severity, 0)} |\n"
+                  )
+
+              out.write("\n")
+
+              out.write(
+                  f"**Total de findings: {len(findings)}**\n\n"
+              )
+
+              if not findings:
+                  out.write(
+                      "## ✅ Nenhuma vulnerabilidade encontrada\n\n"
+                  )
+
+              else:
+                  out.write(
+                      "## Vulnerabilidades encontradas\n\n"
+                  )
+
+                  out.write(
+                      "| Severidade | Vulnerabilidade | "
+                      "Origem | Template | Evidência |\n"
+                  )
+
+                  out.write(
+                      "|---|---|---|---|---|\n"
+                  )
+
+                  def severity_index(item):
+                      try:
+                          return severity_order.index(
+                              item["severity"]
+                          )
+                      except ValueError:
+                          return 99
+
+                  findings.sort(
+                      key=severity_index
+                  )
+
+                  for finding in findings:
+
+                      severity = finding["severity"]
+
+                      name = (
+                          finding["name"]
+                          .replace("|", "\\|")
+                          .replace("\n", " ")
+                      )
+
+                      template = (
+                          finding["template"]
+                          .replace("|", "\\|")
+                      )
+
+                      matched = (
+                          finding["matched"]
+                          .replace("|", "\\|")
+                          .replace("\n", " ")
+                      )
+
+                      out.write(
+                          f"| {icons.get(severity, '⚫')} "
+                          f"{severity.upper()} | "
+                          f"{name} | "
+                          f"{finding['source']} | "
+                          f"`{template}` | "
+                          f"`{matched}` |\n"
+                      )
+
+                  out.write("\n")
+
+              out.write("## Interpretação\n\n")
+
+              if (
+                  counts.get("critical", 0) > 0
+                  or counts.get("high", 0) > 0
+              ):
+                  out.write(
+                      "⚠️ Foram encontrados findings "
+                      "Critical/High que devem ser "
+                      "validados manualmente.\n"
+                  )
+
+              elif len(findings) > 0:
+                  out.write(
+                      "⚠️ Foram encontrados possíveis "
+                      "problemas de segurança que precisam "
+                      "de validação manual.\n"
+                  )
+
+              else:
+                  out.write(
+                      "✅ Os templates executados não "
+                      "identificaram findings.\n"
+                  )
+
+              out.write("\n")
+              out.write(
+                  "> Resultado do Nuclei não significa "
+                  "automaticamente vulnerabilidade explorável. "
+                  "Os findings devem ser validados manualmente "
+                  "para descartar falsos positivos.\n"
+              )
+
+          print(
+              f"Summary generated with "
+              f"{len(findings)} finding(s)."
+          )
+          PY
+
       - name: Upload SARIF to GitHub Security
+        if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: nuclei-results.sarif
           category: mobile-nuclei
 
       - name: Upload raw results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: mobile-nuclei-results
