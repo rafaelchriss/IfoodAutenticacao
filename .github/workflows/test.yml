@@ -1,0 +1,20 @@
+name: Test Soma
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Executar Soma
+        uses: ./.github/actions/soma
+        with:
+          a: 10
+          b: 20
