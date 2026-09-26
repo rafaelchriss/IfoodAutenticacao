@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.rafaelsantos.ifoodautenticacao"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.rafaelsantos.ifoodautenticacao"
