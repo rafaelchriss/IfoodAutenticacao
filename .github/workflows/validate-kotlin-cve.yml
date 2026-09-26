@@ -63,7 +63,7 @@ jobs:
           ./gradlew clean assembleDebug \
             --build-cache \
             --info \
-            > first-build.log 2>&1
+            > first-build.log 2>&1 || true
 
           tail -100 first-build.log
 
@@ -76,7 +76,7 @@ jobs:
           ./gradlew assembleDebug \
             --build-cache \
             --info \
-            > second-build.log 2>&1
+            > second-build.log 2>&1 || true
 
           tail -100 second-build.log
 
@@ -100,72 +100,119 @@ jobs:
             "FROM-CACHE|build cache|cache entry|stored cache|loaded cache" \
             second-build.log || true
 
-      - name: Check affected Kotlin version
+      - name: Generate final validation summary
+        if: always()
         run: |
-          echo "=========================================="
-          echo " VULNERABILITY VALIDATION"
-          echo "=========================================="
+          echo "# Kotlin CVE Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "## Resultado" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "| Verificação | Resultado |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+
+          PLUGIN_FOUND="false"
+          CACHE_FOUND="false"
+          CACHE_REUSED="false"
 
           if grep -q "kotlin-gradle-plugin:2.2.10" build-environment.txt; then
+            PLUGIN_FOUND="true"
 
-            echo "WARNING: kotlin-gradle-plugin 2.2.10 found"
-            echo "The affected component is present."
-
-            echo "### Kotlin CVE validation" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "❌ kotlin-gradle-plugin 2.2.10 detected" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "The vulnerable dependency is present in the build environment." >> $GITHUB_STEP_SUMMARY
-
+            echo "| Kotlin Gradle Plugin 2.2.10 | ❌ Vulnerável detectado |" \
+              >> $GITHUB_STEP_SUMMARY
           else
-
-            echo "Exact version 2.2.10 was not found."
-
-            echo "### Kotlin CVE validation" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "⚠️ kotlin-gradle-plugin 2.2.10 was not detected directly." >> $GITHUB_STEP_SUMMARY
-
+            echo "| Kotlin Gradle Plugin 2.2.10 | ✅ Não detectado |" \
+              >> $GITHUB_STEP_SUMMARY
           fi
-
-      - name: Check Build Cache reachability
-        run: |
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Gradle Build Cache" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
 
           if grep -Eqi \
-            "FROM-CACHE|loaded cache entry|build cache" \
+            "build cache|stored cache entry|cache entry" \
+            first-build.log second-build.log; then
+
+            CACHE_FOUND="true"
+
+            echo "| Gradle Build Cache | ⚠️ Ativo |" \
+              >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Gradle Build Cache | ✅ Não identificado |" \
+              >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if grep -Eqi \
+            "FROM-CACHE|loaded cache entry" \
             second-build.log; then
 
-            echo "Build Cache activity detected."
+            CACHE_REUSED="true"
 
-            echo "✅ Build Cache activity detected during compilation." \
+            echo "| Reutilização de cache | ⚠️ Confirmada |" \
+              >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Reutilização de cache | ⚪ Não confirmada |" \
+              >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Diagnóstico" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$PLUGIN_FOUND" = "true" ] && \
+             [ "$CACHE_FOUND" = "true" ] && \
+             [ "$CACHE_REUSED" = "true" ]; then
+
+            echo "### ⚠️ TRUE POSITIVE / REACHABLE" \
+              >> $GITHUB_STEP_SUMMARY
+
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            echo "A versão vulnerável do Kotlin Gradle Plugin foi detectada." \
+              >> $GITHUB_STEP_SUMMARY
+
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            echo "O Gradle Build Cache está ativo e foi reutilizado." \
+              >> $GITHUB_STEP_SUMMARY
+
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            echo "Isso confirma que o componente vulnerável está presente e que o caminho relacionado ao cache é alcançável durante o build." \
+              >> $GITHUB_STEP_SUMMARY
+
+          elif [ "$PLUGIN_FOUND" = "true" ]; then
+
+            echo "### ⚠️ DEPENDÊNCIA VULNERÁVEL PRESENTE" \
+              >> $GITHUB_STEP_SUMMARY
+
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            echo "A versão vulnerável foi encontrada, mas a reutilização do Build Cache não foi confirmada." \
               >> $GITHUB_STEP_SUMMARY
 
           else
 
-            echo "No clear Build Cache usage detected."
-
-            echo "⚠️ No clear Build Cache reuse was identified." \
+            echo "### ✅ VERSÃO VULNERÁVEL NÃO DETECTADA" \
               >> $GITHUB_STEP_SUMMARY
 
           fi
 
-      - name: Generate final validation summary
-        run: |
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Interpretation" >> $GITHUB_STEP_SUMMARY
+          echo "## RCE" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Test | Meaning |" >> $GITHUB_STEP_SUMMARY
+
+          echo "| Validação | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|" >> $GITHUB_STEP_SUMMARY
-          echo "| Vulnerable plugin detected | Dependency finding confirmed |" >> $GITHUB_STEP_SUMMARY
-          echo "| Build Cache active | Vulnerable functionality may be reachable |" >> $GITHUB_STEP_SUMMARY
-          echo "| Cache reused on second build | Cache processing confirmed |" >> $GITHUB_STEP_SUMMARY
-          echo "| Arbitrary command executed | RCE demonstrated |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dependência vulnerável presente | $PLUGIN_FOUND |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Cache ativo | $CACHE_FOUND |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cache reutilizado | $CACHE_REUSED |" >> $GITHUB_STEP_SUMMARY
+          echo "| Execução arbitrária demonstrada | ❌ NÃO |" >> $GITHUB_STEP_SUMMARY
+
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "This workflow validates presence and reachability. It does not inject a malicious serialized cache object." >> $GITHUB_STEP_SUMMARY
+
+          echo "> Este workflow valida presença e reachability. Ele não injeta um objeto malicioso no Build Cache, portanto não demonstra RCE por si só." \
+            >> $GITHUB_STEP_SUMMARY
 
       - name: Upload validation evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: kotlin-cve-validation
