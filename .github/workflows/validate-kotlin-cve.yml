@@ -3,6 +3,11 @@ name: Validate Kotlin Gradle Plugin CVE
 on:
   workflow_dispatch:
 
+  push:
+    branches:
+      - master
+      - main
+
 permissions:
   contents: read
 
