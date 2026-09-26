@@ -64,15 +64,32 @@ jobs:
 
       - name: Install Nuclei
         run: |
-          curl -s https://api.github.com/repos/projectdiscovery/nuclei/releases/latest \
-          | grep "browser_download_url.*linux_amd64.zip" \
-          | cut -d '"' -f 4 \
-          | wget -qi -
+          echo "======================================"
+          echo " INSTALL NUCLEI"
+          echo "======================================"
 
-          unzip nuclei_*_linux_amd64.zip
+          DOWNLOAD_URL=$(curl -s \
+            https://api.github.com/repos/projectdiscovery/nuclei/releases/latest \
+            | grep "browser_download_url.*linux_amd64.zip" \
+            | cut -d '"' -f 4 \
+            | head -n 1)
 
-          sudo mv nuclei /usr/local/bin/
+          echo "Download:"
+          echo "$DOWNLOAD_URL"
 
+          wget -q "$DOWNLOAD_URL" -O nuclei.zip
+
+          mkdir -p nuclei-install
+
+          unzip -o -q nuclei.zip -d nuclei-install
+
+          sudo install \
+            -m 0755 \
+            nuclei-install/nuclei \
+            /usr/local/bin/nuclei
+
+          echo ""
+          echo "Nuclei instalado:"
           nuclei -version
 
       - name: Clone Mobile Nuclei Templates
