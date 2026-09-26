@@ -5,10 +5,12 @@ on:
 
   push:
     branches:
+      - master
       - main
 
   pull_request:
     branches:
+      - master
       - main
 
 permissions:
@@ -95,7 +97,8 @@ jobs:
               -o nuclei-keys.jsonl \
               || true
 
-      - name: Show findings
+      - name: Show findings in logs
+        if: always()
         run: |
           echo "======================================"
           echo "ANDROID FINDINGS"
@@ -111,25 +114,28 @@ jobs:
           cat nuclei-keys.jsonl || true
 
       - name: Create SARIF
+        if: always()
         run: |
           python3 <<'PY'
           import json
           import os
 
           files = [
-              "nuclei-android.jsonl",
-              "nuclei-keys.jsonl"
+              ("Android", "nuclei-android.jsonl"),
+              ("API Keys", "nuclei-keys.jsonl")
           ]
 
           results = []
           rules = {}
           counter = 0
 
-          for filename in files:
+          for source, filename in files:
+
               if not os.path.exists(filename):
                   continue
 
               with open(filename, "r", encoding="utf-8") as f:
+
                   for line in f:
 
                       line = line.strip()
@@ -144,8 +150,15 @@ jobs:
 
                       info = finding.get("info", {})
 
-                      name = info.get("name", "Nuclei Finding")
-                      severity = info.get("severity", "unknown")
+                      name = info.get(
+                          "name",
+                          "Nuclei Finding"
+                      )
+
+                      severity = info.get(
+                          "severity",
+                          "unknown"
+                      ).lower()
 
                       template_id = finding.get(
                           "template-id",
@@ -176,14 +189,14 @@ jobs:
                           },
                           "properties": {
                               "security-severity": {
-                                  "critical": "9.0",
+                                  "critical": "9.5",
                                   "high": "8.0",
                                   "medium": "5.0",
                                   "low": "3.0",
                                   "info": "1.0",
                                   "unknown": "1.0"
                               }.get(
-                                  severity.lower(),
+                                  severity,
                                   "1.0"
                               )
                           }
@@ -196,7 +209,7 @@ jobs:
                           "low": "note",
                           "info": "note"
                       }.get(
-                          severity.lower(),
+                          severity,
                           "warning"
                       )
 
@@ -207,6 +220,7 @@ jobs:
                               "text": (
                                   f"{name}\n"
                                   f"Severity: {severity}\n"
+                                  f"Source: {source}\n"
                                   f"Matched: {matched}"
                               )
                           }
@@ -231,8 +245,16 @@ jobs:
               ]
           }
 
-          with open("nuclei-results.sarif", "w") as f:
-              json.dump(sarif, f, indent=2)
+          with open(
+              "nuclei-results.sarif",
+              "w",
+              encoding="utf-8"
+          ) as f:
+              json.dump(
+                  sarif,
+                  f,
+                  indent=2
+              )
 
           print(
               f"{len(results)} finding(s) converted to SARIF."
@@ -258,11 +280,18 @@ jobs:
           findings = []
 
           for source, filename in files:
+
               if not os.path.exists(filename):
                   continue
 
-              with open(filename, "r", encoding="utf-8") as f:
+              with open(
+                  filename,
+                  "r",
+                  encoding="utf-8"
+              ) as f:
+
                   for line in f:
+
                       line = line.strip()
 
                       if not line:
@@ -273,9 +302,12 @@ jobs:
                       except Exception:
                           continue
 
-                      info = item.get("info", {})
+                      info = item.get(
+                          "info",
+                          {}
+                      )
 
-                      findings.append({
+                      finding = {
                           "source": source,
                           "name": info.get(
                               "name",
@@ -293,10 +325,14 @@ jobs:
                               item.get("matched-at")
                               or item.get("host")
                               or "N/A"
+                          ),
+                          "description": info.get(
+                              "description",
+                              ""
                           )
-                      })
+                      }
 
-          summary_file = os.environ["GITHUB_STEP_SUMMARY"]
+                      findings.append(finding)
 
           severity_order = [
               "critical",
@@ -317,18 +353,34 @@ jobs:
           }
 
           counts = Counter(
-              finding["severity"]
-              for finding in findings
+              item["severity"]
+              for item in findings
           )
 
-          with open(summary_file, "a", encoding="utf-8") as out:
+          summary_file = os.environ[
+              "GITHUB_STEP_SUMMARY"
+          ]
 
-              out.write("## Resultado geral\n\n")
+          with open(
+              summary_file,
+              "a",
+              encoding="utf-8"
+          ) as out:
 
-              out.write("| Severidade | Quantidade |\n")
-              out.write("|---|---:|\n")
+              out.write(
+                  "## 📊 Resultado geral\n\n"
+              )
+
+              out.write(
+                  "| Severidade | Quantidade |\n"
+              )
+
+              out.write(
+                  "|---|---:|\n"
+              )
 
               for severity in severity_order:
+
                   out.write(
                       f"| {icons[severity]} "
                       f"{severity.upper()} | "
@@ -338,17 +390,25 @@ jobs:
               out.write("\n")
 
               out.write(
-                  f"**Total de findings: {len(findings)}**\n\n"
+                  f"### Total de findings: "
+                  f"{len(findings)}\n\n"
               )
 
               if not findings:
+
                   out.write(
                       "## ✅ Nenhuma vulnerabilidade encontrada\n\n"
                   )
 
-              else:
                   out.write(
-                      "## Vulnerabilidades encontradas\n\n"
+                      "Os templates Android e Keys "
+                      "não identificaram findings.\n"
+                  )
+
+              else:
+
+                  out.write(
+                      "## 🚨 Vulnerabilidades encontradas\n\n"
                   )
 
                   out.write(
@@ -361,10 +421,12 @@ jobs:
                   )
 
                   def severity_index(item):
+
                       try:
                           return severity_order.index(
                               item["severity"]
                           )
+
                       except ValueError:
                           return 99
 
@@ -374,12 +436,19 @@ jobs:
 
                   for finding in findings:
 
-                      severity = finding["severity"]
+                      severity = finding[
+                          "severity"
+                      ]
 
                       name = (
                           finding["name"]
                           .replace("|", "\\|")
                           .replace("\n", " ")
+                      )
+
+                      source = (
+                          finding["source"]
+                          .replace("|", "\\|")
                       )
 
                       template = (
@@ -394,47 +463,117 @@ jobs:
                       )
 
                       out.write(
-                          f"| {icons.get(severity, '⚫')} "
+                          f"| "
+                          f"{icons.get(severity, '⚫')} "
                           f"{severity.upper()} | "
                           f"{name} | "
-                          f"{finding['source']} | "
+                          f"{source} | "
                           f"`{template}` | "
                           f"`{matched}` |\n"
                       )
 
                   out.write("\n")
 
-              out.write("## Interpretação\n\n")
-
-              if (
-                  counts.get("critical", 0) > 0
-                  or counts.get("high", 0) > 0
-              ):
                   out.write(
-                      "⚠️ Foram encontrados findings "
-                      "Critical/High que devem ser "
-                      "validados manualmente.\n"
+                      "## 🔎 Detalhes dos findings\n\n"
+                  )
+
+                  for index, finding in enumerate(
+                      findings,
+                      start=1
+                  ):
+
+                      severity = finding[
+                          "severity"
+                      ]
+
+                      out.write(
+                          f"### {index}. "
+                          f"{icons.get(severity, '⚫')} "
+                          f"{finding['name']}\n\n"
+                      )
+
+                      out.write(
+                          f"- **Severidade:** "
+                          f"{severity.upper()}\n"
+                      )
+
+                      out.write(
+                          f"- **Origem:** "
+                          f"{finding['source']}\n"
+                      )
+
+                      out.write(
+                          f"- **Template:** "
+                          f"`{finding['template']}`\n"
+                      )
+
+                      out.write(
+                          f"- **Evidência:** "
+                          f"`{finding['matched']}`\n"
+                      )
+
+                      if finding["description"]:
+
+                          description = (
+                              finding["description"]
+                              .replace("\n", " ")
+                          )
+
+                          out.write(
+                              f"- **Descrição:** "
+                              f"{description}\n"
+                          )
+
+                      out.write("\n")
+
+              out.write(
+                  "## 🧪 Interpretação\n\n"
+              )
+
+              if counts.get(
+                  "critical",
+                  0
+              ) > 0:
+
+                  out.write(
+                      "🔴 Foram encontrados findings "
+                      "CRITICAL. Priorize a validação "
+                      "manual desses resultados.\n\n"
+                  )
+
+              elif counts.get(
+                  "high",
+                  0
+              ) > 0:
+
+                  out.write(
+                      "🟠 Foram encontrados findings "
+                      "HIGH que devem ser validados "
+                      "manualmente.\n\n"
                   )
 
               elif len(findings) > 0:
+
                   out.write(
                       "⚠️ Foram encontrados possíveis "
                       "problemas de segurança que precisam "
-                      "de validação manual.\n"
+                      "de validação manual.\n\n"
                   )
 
               else:
+
                   out.write(
-                      "✅ Os templates executados não "
-                      "identificaram findings.\n"
+                      "✅ Nenhum finding foi identificado "
+                      "pelos templates executados.\n\n"
                   )
 
-              out.write("\n")
               out.write(
-                  "> Resultado do Nuclei não significa "
-                  "automaticamente vulnerabilidade explorável. "
-                  "Os findings devem ser validados manualmente "
-                  "para descartar falsos positivos.\n"
+                  "> O resultado do Nuclei não confirma "
+                  "automaticamente uma vulnerabilidade "
+                  "explorável. Os findings devem ser "
+                  "validados manualmente para descartar "
+                  "falsos positivos.\n"
               )
 
           print(
