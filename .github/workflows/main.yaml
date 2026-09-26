@@ -20,7 +20,7 @@ jobs:
         run: echo "Build"
 
 
-    test:
+      test:
     runs-on: ubuntu-latest
     needs: build
 
